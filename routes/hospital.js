@@ -1,138 +1,131 @@
 var express = require('express');
-var bcrypt = require('bcrypt');
-var jwt = require('jsonwebtoken');
-
 var app = express();
 
-var UserModel = require('../models/user');
-var middlewareAuthentication = require('../middlewares/authentication')
+var middlewareAuthentication = require('../middlewares/authentication');
+var HospitalModel = require('../models/hospital');
 
 /* ======================================
- Creando endpoint para acceder a los usuarios
+ Creando la ruta para obtener todos los hospitales
 ======================================*/
 app.get('/', (req, res) => {
     let offset = req.query.offset || 0;
     offset = Number(offset);
-
-    UserModel.find({}, 'id name email role img')
+    
+    HospitalModel.find({})
+        .populate('user', 'name email img')
         .skip(offset)
         .limit(10)
         .exec((err, data) => {
             if (err) {
                 return res.status(500).json({
                     ok: false,
-                    message: 'Error al cargar la lista de  usuarios',
+                    message: 'Error al cargar la lista de  hospitales',
                     error: err
                 });
             }
-
-            UserModel.count({}, (err, count) => {
+            
+            HospitalModel.count({}, (err, count) => {
                 res.status(200).json({
                     count,
                     ok: true,
-                    users: data
+                    hospitals: data
                 });
-            })
+            });
         });
 });
 
-
 /* ======================================
- Creando endpoint para ingresar usuarios
+ Creando la ruta para guardar hospitales
 ======================================*/
-
 app.post('/', middlewareAuthentication.verifyToken, (req, res) => {
-    // falta comprobar que la contraseña no este vacia
     let body = req.body;
 
-    let user = new UserModel({
+    let hospital = new HospitalModel({
         name: body.name,
-        email: body.email,
         img: body.img,
-        role: body.role,
-        password: bcrypt.hashSync(body.password, 10)
+        user: req.user._id
     });
 
-    user.save((err, userStored) => {
+    hospital.save((err, hospitalStored) => {
         if (err) {
-            return res.status(400).json({
+            return res.status(500).json({
                 ok: false,
-                message: 'Error al crear el usuario',
+                message: 'Error al crear el hospital',
                 error: err
             });
         }
+
         res.status(201).json({
             ok: true,
-            body: userStored,
+            body: hospitalStored,
             /* ======================================
              Mostrando los datos de las peticion y los datos del usuario autenticado
             ======================================*/
             userToken: req.user
-
         });
     });
+
 });
 
 /* ======================================
- Creando el metodo actualizar de los usuarios
+ Creando el metodo actualizar de los hospitales
 ======================================*/
 app.put('/:id', middlewareAuthentication.verifyToken, (req, res) => {
     let id = req.params.id;
     let body = req.body;
 
-    UserModel.findById(id, 'id name email role img', (err, user) => {
+    HospitalModel.findById(id, (err, hospital) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
-                message: 'Error al buscar el usuario',
+                message: 'Error al buscar el hospital',
                 error: err
             });
-        } else if (!user) {
+        } else if (!hospital) {
             return res.status(400).json({
                 ok: false,
-                message: `Error el usuario con el ${id} no existe`,
+                message: `Error el hospital con el ${id} no existe`,
                 error: {
-                    message: `Error el usuario con el ${id} no existe`
+                    message: `Error el hospital con el ${id} no existe`
                 }
             });
         }
 
-        user.name = body.name;
-        user.email = body.email;
-        user.role = body.role;
+        hospital.name = body.name;
+        hospital.user = req.user._id;
 
-        user.save((err, userPut) => {
+        hospital.save((err, hospitalPut) => {
             if (err) {
                 return res.status(400).json({
                     ok: false,
-                    message: 'Error al actualizar el usuario',
+                    message: 'Error al actualizar el hospital',
                     error: err
                 });
-            } else if (!userPut) {
+            } else if (!hospitalPut) {
                 return res.status(400).json({
                     ok: false,
-                    message: `Error el usuario con el ${id} no existe`,
+                    message: `Error el hospital con el ${id} no existe`,
                     error: {
-                        message: `Error el usuario con el ${id} no existe`
+                        message: `Error el hospital con el ${id} no existe`
                     }
                 });
             }
             res.status(201).json({
                 ok: true,
-                body: userPut
+                body: hospitalPut
             });
         });
     });
 });
 
 /* ======================================
- Creando el metodo para eliminar usuarios
+ Creando el metodo para eliminar hospitales
 ======================================*/
 
 app.delete('/:id', middlewareAuthentication.verifyToken, (req, res) => {
     let id = req.params.id;
 
-    UserModel.findByIdAndRemove(id, (err, userDelete) => {
+    HospitalModel.findByIdAndRemove(id, (err, hospitalDelete) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
@@ -141,18 +134,18 @@ app.delete('/:id', middlewareAuthentication.verifyToken, (req, res) => {
             });
         }
 
-        if (!userDelete) {
+        if (!hospitalDelete) {
             return res.status(400).json({
                 ok: false,
-                message: `Error el usuario con el ${id} no existe`,
+                message: `Error el hospital con el ${id} no existe`,
                 errors: {
-                    message: `Error el usuario con el ${id} no existe`
+                    message: `Error el hospital con el ${id} no existe`
                 }
             });
         }
         res.status(201).json({
             ok: true,
-            body: userDelete
+            body: hospitalDelete
         });
 
     });

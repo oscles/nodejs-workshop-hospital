@@ -1,138 +1,139 @@
 var express = require('express');
-var bcrypt = require('bcrypt');
-var jwt = require('jsonwebtoken');
-
 var app = express();
 
-var UserModel = require('../models/user');
-var middlewareAuthentication = require('../middlewares/authentication')
+var middlewareAuthentication = require('../middlewares/authentication');
+var DoctorModel = require('../models/doctor');
 
 /* ======================================
- Creando endpoint para acceder a los usuarios
+ Creando la ruta para obtener todos los doctores
 ======================================*/
 app.get('/', (req, res) => {
-    let offset = req.query.offset || 0;
-    offset = Number(offset);
 
-    UserModel.find({}, 'id name email role img')
-        .skip(offset)
+    let offset = req.query.offset || 0;
+
+    DoctorModel.find({})
+        /* ======================================
+         populate() muestra los datos de los objetos foraneos
+         limit(number) permite mostrar cierta cantidad de registros
+         skip() va saltando de acuerdo al numero que le pasemos
+        ======================================*/
+        .skip(Number(offset))
         .limit(10)
+        .populate('user', 'name img email')
+        .populate('hospital')
         .exec((err, data) => {
             if (err) {
                 return res.status(500).json({
                     ok: false,
-                    message: 'Error al cargar la lista de  usuarios',
+                    message: 'Error al cargar la lista de  doctores',
                     error: err
                 });
             }
-
-            UserModel.count({}, (err, count) => {
+            
+            DoctorModel.count({}, (err, count) => {
                 res.status(200).json({
                     count,
                     ok: true,
-                    users: data
+                    doctors: data
                 });
-            })
+            });
         });
 });
 
-
 /* ======================================
- Creando endpoint para ingresar usuarios
+ Creando la ruta para guardar doctores
 ======================================*/
-
 app.post('/', middlewareAuthentication.verifyToken, (req, res) => {
-    // falta comprobar que la contraseña no este vacia
     let body = req.body;
 
-    let user = new UserModel({
+    let doctor = new DoctorModel({
         name: body.name,
-        email: body.email,
         img: body.img,
-        role: body.role,
-        password: bcrypt.hashSync(body.password, 10)
+        hospital: body.hospital,
+        user: req.user._id
     });
 
-    user.save((err, userStored) => {
+    doctor.save((err, doctorStored) => {
         if (err) {
-            return res.status(400).json({
+            return res.status(500).json({
                 ok: false,
-                message: 'Error al crear el usuario',
+                message: 'Error al crear el doctor',
                 error: err
             });
         }
+
         res.status(201).json({
             ok: true,
-            body: userStored,
+            body: doctorStored,
             /* ======================================
              Mostrando los datos de las peticion y los datos del usuario autenticado
             ======================================*/
             userToken: req.user
-
         });
     });
+
 });
 
 /* ======================================
- Creando el metodo actualizar de los usuarios
+ Creando el metodo actualizar de los doctores
 ======================================*/
 app.put('/:id', middlewareAuthentication.verifyToken, (req, res) => {
     let id = req.params.id;
     let body = req.body;
 
-    UserModel.findById(id, 'id name email role img', (err, user) => {
+    DoctorModel.findById(id, (err, doctor) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
-                message: 'Error al buscar el usuario',
+                message: 'Error al buscar el doctor',
                 error: err
             });
-        } else if (!user) {
+        } else if (!doctor) {
             return res.status(400).json({
                 ok: false,
-                message: `Error el usuario con el ${id} no existe`,
+                message: `Error el doctor con el ${id} no existe`,
                 error: {
-                    message: `Error el usuario con el ${id} no existe`
+                    message: `Error el doctor con el ${id} no existe`
                 }
             });
         }
 
-        user.name = body.name;
-        user.email = body.email;
-        user.role = body.role;
+        doctor.name = body.name;
+        doctor.user = req.user._id;
+        doctor.hospital = body.hospital;
 
-        user.save((err, userPut) => {
+        doctor.save((err, doctorPut) => {
             if (err) {
                 return res.status(400).json({
                     ok: false,
-                    message: 'Error al actualizar el usuario',
+                    message: 'Error al actualizar el doctor',
                     error: err
                 });
-            } else if (!userPut) {
+            } else if (!doctorPut) {
                 return res.status(400).json({
                     ok: false,
-                    message: `Error el usuario con el ${id} no existe`,
+                    message: `Error el doctor con el ${id} no existe`,
                     error: {
-                        message: `Error el usuario con el ${id} no existe`
+                        message: `Error el doctor con el ${id} no existe`
                     }
                 });
             }
             res.status(201).json({
                 ok: true,
-                body: userPut
+                body: doctorPut
             });
         });
     });
 });
 
 /* ======================================
- Creando el metodo para eliminar usuarios
+ Creando el metodo para eliminar doctores
 ======================================*/
 
 app.delete('/:id', middlewareAuthentication.verifyToken, (req, res) => {
     let id = req.params.id;
 
-    UserModel.findByIdAndRemove(id, (err, userDelete) => {
+    DoctorModel.findByIdAndRemove(id, (err, doctorDelete) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
@@ -141,18 +142,18 @@ app.delete('/:id', middlewareAuthentication.verifyToken, (req, res) => {
             });
         }
 
-        if (!userDelete) {
+        if (!doctorDelete) {
             return res.status(400).json({
                 ok: false,
-                message: `Error el usuario con el ${id} no existe`,
+                message: `Error el doctor con el ${id} no existe`,
                 errors: {
-                    message: `Error el usuario con el ${id} no existe`
+                    message: `Error el doctor con el ${id} no existe`
                 }
             });
         }
         res.status(201).json({
             ok: true,
-            body: userDelete
+            body: doctorDelete
         });
 
     });

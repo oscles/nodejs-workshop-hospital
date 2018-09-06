@@ -29,6 +29,8 @@ let userSchema = new Schema({
         type: String,
         required: false
     },
+    
+    google: {type:Boolean, required:true, default:false},
 
     role: {
         type: String,

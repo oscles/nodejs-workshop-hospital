@@ -22,8 +22,8 @@ app.post('/:collection/:id', (req, res) => {
         });
     }
 
-    let imageFile = req.files.image;
-    let extension = req.files.image.name.split('.')[1];
+    let imageFile = req.files.img;
+    let extension = req.files.img.name.split('.')[1];
 
     /* ======================================
      validando extensiones validas
